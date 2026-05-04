@@ -18,15 +18,57 @@ type DayPlan = {
   sessions: Session[]
 }
 
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error('Missing GEMINI_API_KEY')
+const getGenAI = () => {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) return null
+  return new GoogleGenerativeAI(apiKey)
 }
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 
 export async function generateStudySchedule(
   subjects: Subject[]
 ): Promise<DayPlan[]> {
+  const genAI = getGenAI()
+  
+  if (genAI) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+      
+      const prompt = `
+        You are an expert study planner. Generate a personalized weekly study schedule based on these subjects:
+        ${JSON.stringify(subjects, null, 2)}
+
+        Requirements:
+        1. Distribute the "hours_per_week" for each subject across 7 days (Monday to Sunday).
+        2. Each session must have: "subject", "topic" (specific to the goal), "duration_minutes", and a "tip".
+        3. The output MUST be a valid JSON array of DayPlan objects.
+        4. Return ONLY the JSON.
+
+        Example Structure:
+        [
+          {
+            "day": "Monday",
+            "sessions": [
+              { "subject": "Math", "topic": "Calculus", "duration_minutes": 60, "tip": "Practice problems" }
+            ]
+          }
+        ]
+      `
+
+      const result = await model.generateContent(prompt)
+      const response = await result.response
+      const text = response.text().replace(/```json|```/g, '').trim()
+      const schedule = JSON.parse(text)
+      
+      if (Array.isArray(schedule) && schedule.length > 0) {
+        return schedule
+      }
+      throw new Error('AI generated an invalid schedule format')
+    } catch (error) {
+      console.error('Gemini error, using fallback:', error)
+    }
+  }
+
+  // Fallback Logic
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   // Calculate total hours per week
