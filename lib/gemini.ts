@@ -7,7 +7,12 @@ export async function generateStudySchedule(subjects: {
   goal: string
   hours_per_week: number
 }[]) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-flash-latest',
+    generationConfig: {
+      temperature: 0.7,
+    },
+  })
 
   const prompt = `You are an expert study planner. Create a detailed 7-day study schedule for a student with the following subjects and goals:
 
@@ -39,8 +44,12 @@ Rules:
 
   const result = await model.generateContent(prompt)
   const text = result.response.text()
-  
-  // Clean and parse JSON
-  const cleaned = text.replace(/```json\n?|\n?```/g, '').trim()
-  return JSON.parse(cleaned)
+
+  // 🔥 safer JSON extraction (handles extra text if model misbehaves)
+  const jsonMatch = text.match(/\[\s*{[\s\S]*}\s*\]/)
+  if (!jsonMatch) {
+    throw new Error('Invalid JSON response from Gemini:\n' + text)
+  }
+
+  return JSON.parse(jsonMatch[0])
 }
