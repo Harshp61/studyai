@@ -1,55 +1,84 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-
-export async function generateStudySchedule(subjects: {
+type Subject = {
   name: string
   goal: string
   hours_per_week: number
-}[]) {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash-latest',
-    generationConfig: {
-      temperature: 0.7,
-    },
-  })
+}
 
-  const prompt = `You are an expert study planner. Create a detailed 7-day study schedule for a student with the following subjects and goals:
+type Session = {
+  subject: string
+  topic: string
+  duration_minutes: number
+  tip: string
+}
 
-${subjects.map((s, i) => `${i + 1}. Subject: ${s.name}
-   Goal: ${s.goal}
-   Hours per week: ${s.hours_per_week}`).join('\n\n')}
+type DayPlan = {
+  day: string
+  sessions: Session[]
+}
 
-Return ONLY a valid JSON array (no markdown, no explanation) with this exact structure:
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+
+export async function generateStudySchedule(
+  subjects: Subject[]
+): Promise<DayPlan[]> {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: 'application/json', // 🔥 ensures valid JSON
+      },
+    })
+
+    const prompt = `
+Create a detailed 7-day study schedule.
+
+Subjects:
+${subjects
+  .map(
+    (s, i) =>
+      `${i + 1}. ${s.name} (${s.hours_per_week} hrs/week) - Goal: ${s.goal}`
+  )
+  .join('\n')}
+
+Return JSON in this exact format:
 [
   {
     "day": "Monday",
     "sessions": [
       {
-        "subject": "Subject Name",
-        "topic": "Specific topic to study",
-        "duration_minutes": 60,
-        "tip": "A helpful study tip for this session"
+        "subject": "string",
+        "topic": "string",
+        "duration_minutes": number,
+        "tip": "string"
       }
     ]
   }
 ]
 
 Rules:
-- Distribute hours proportionally based on hours_per_week
-- Break sessions into 45-90 minute chunks
-- Include specific topics, not vague descriptions
-- Add rest days where appropriate
-- Ensure variety throughout the week`
+- Distribute hours proportionally
+- Sessions must be 45–90 minutes
+- Keep realistic workload for a college student
+- Include at least 1 lighter/rest day
+- Avoid repeating same subject too many times in a row
+`
 
-  const result = await model.generateContent(prompt)
-  const text = result.response.text()
+    const result = await model.generateContent(prompt)
+    const text = result.response.text()
 
-  // 🔥 safer JSON extraction (handles extra text if model misbehaves)
-  const jsonMatch = text.match(/\[\s*{[\s\S]*}\s*\]/)
-  if (!jsonMatch) {
-    throw new Error('Invalid JSON response from Gemini:\n' + text)
+    const parsed: DayPlan[] = JSON.parse(text)
+
+    // basic validation (optional but useful)
+    if (!Array.isArray(parsed)) {
+      throw new Error('Invalid format: Expected array')
+    }
+
+    return parsed
+  } catch (error: any) {
+    console.error('Gemini Error:', error.message)
+    throw new Error('Failed to generate study schedule')
   }
-
-  return JSON.parse(jsonMatch[0])
 }
