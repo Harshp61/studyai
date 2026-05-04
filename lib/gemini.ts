@@ -27,89 +27,39 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 export async function generateStudySchedule(
   subjects: Subject[]
 ): Promise<DayPlan[]> {
-  try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash-latest',
-      generationConfig: {
-        temperature: 0.7,
-        responseMimeType: 'application/json',
-      },
-    })
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    const prompt = `
-Create a detailed 7-day study schedule.
+  // Calculate total hours per week
+  const totalHours = subjects.reduce((sum, subject) => sum + subject.hours_per_week, 0);
+  const hoursPerDay = totalHours / 7;
 
-Subjects:
-${subjects
-  .map(
-    (s, i) =>
-      `${i + 1}. ${s.name} (${s.hours_per_week} hrs/week) - Goal: ${s.goal}`
-  )
-  .join('\n')}
+  const schedule: DayPlan[] = DAYS.map(day => ({
+    day,
+    sessions: [],
+  }));
 
-Return JSON in this exact format:
-[
-  {
-    "day": "Monday",
-    "sessions": [
-      {
-        "subject": "string",
-        "topic": "string",
-        "duration_minutes": number,
-        "tip": "string"
-      }
-    ]
+  // Distribute hours across days and subjects
+  for (const subject of subjects) {
+    let remainingHours = subject.hours_per_week;
+
+    for (const dayPlan of schedule) {
+      if (remainingHours <= 0) break;
+
+      const sessionDuration = Math.min(remainingHours, hoursPerDay / subjects.length);
+      dayPlan.sessions.push({
+        subject: subject.name,
+        topic: `Study ${subject.name}`,
+        duration_minutes: Math.round(sessionDuration * 60),
+        tip: `Focus on your goal: ${subject.goal}`,
+      });
+
+      remainingHours -= sessionDuration;
+    }
   }
-]
 
-Rules:
-- Distribute hours proportionally
-- Sessions must be 45–90 minutes
-- Keep realistic workload
-- Include at least 1 lighter day
-- Avoid repetition
-`
+  // Ensure one lighter day
+  const lighterDay = schedule[Math.floor(Math.random() * schedule.length)];
+  lighterDay.sessions = lighterDay.sessions.slice(0, Math.max(1, lighterDay.sessions.length - 1));
 
-    const result = await model.generateContent(prompt)
-    const text = result.response.text()
-
-    console.log("🔍 RAW GEMINI RESPONSE:\n", text)
-
-    // ✅ Clean markdown if Gemini adds it
-    const cleaned = text
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
-      .trim()
-
-    let parsed: DayPlan[]
-
-    try {
-      parsed = JSON.parse(cleaned)
-    } catch (err) {
-      console.error("❌ JSON PARSE FAILED")
-      throw new Error("Invalid JSON from Gemini")
-    }
-
-    // ✅ Validate structure
-    if (!Array.isArray(parsed)) {
-      throw new Error('Invalid format: Expected array')
-    }
-
-    for (const day of parsed) {
-      if (!day.day || !Array.isArray(day.sessions)) {
-        throw new Error('Invalid day format from AI')
-      }
-
-      for (const session of day.sessions) {
-        if (!session.subject || !session.duration_minutes) {
-          throw new Error('Invalid session format')
-        }
-      }
-    }
-
-    return parsed
-  } catch (error: any) {
-    console.error('🔥 Gemini Error:', error)
-    throw new Error(error.message || 'Failed to generate study schedule')
-  }
+  return schedule;
 }

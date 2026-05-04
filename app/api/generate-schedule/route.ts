@@ -40,7 +40,7 @@ export async function POST() {
       )
     }
 
-    // ✅ Generate schedule
+    // ✅ Generate schedule using custom logic
     const schedule = await generateStudySchedule(
       subjects.map(s => ({
         name: s.name,
