@@ -1,6 +1,10 @@
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg)', overflow: 'hidden', position: 'relative' }}>
       {/* Background grid */}
@@ -37,18 +41,29 @@ export default function Home() {
           <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>StudyAI</span>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <Link href="/login" style={{
-            padding: '8px 20px', borderRadius: '8px',
-            border: '1px solid var(--border-bright)', color: 'var(--text-primary)',
-            textDecoration: 'none', fontSize: '14px', fontWeight: '500',
-            transition: 'border-color 0.2s',
-          }}>Log in</Link>
-          <Link href="/signup" style={{
-            padding: '8px 20px', borderRadius: '8px',
-            background: 'linear-gradient(135deg, var(--accent), #a855f7)',
-            color: 'white', textDecoration: 'none',
-            fontSize: '14px', fontWeight: '600',
-          }}>Get Started Free</Link>
+          {user ? (
+            <Link href="/dashboard" style={{
+              padding: '8px 24px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, var(--accent), #a855f7)',
+              color: 'white', textDecoration: 'none',
+              fontSize: '14px', fontWeight: '600',
+            }}>Go to Dashboard</Link>
+          ) : (
+            <>
+              <Link href="/login" style={{
+                padding: '8px 20px', borderRadius: '8px',
+                border: '1px solid var(--border-bright)', color: 'var(--text-primary)',
+                textDecoration: 'none', fontSize: '14px', fontWeight: '500',
+                transition: 'border-color 0.2s',
+              }}>Log in</Link>
+              <Link href="/signup" style={{
+                padding: '8px 20px', borderRadius: '8px',
+                background: 'linear-gradient(135deg, var(--accent), #a855f7)',
+                color: 'white', textDecoration: 'none',
+                fontSize: '14px', fontWeight: '600',
+              }}>Get Started Free</Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -83,23 +98,25 @@ export default function Home() {
         </p>
 
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <Link href="/signup" style={{
+          <Link href={user ? "/dashboard" : "/signup"} style={{
             padding: '14px 32px', borderRadius: '12px',
             background: 'linear-gradient(135deg, var(--accent), #a855f7)',
             color: 'white', textDecoration: 'none',
             fontSize: '16px', fontWeight: '700',
             boxShadow: '0 8px 32px var(--accent-glow)',
           }}>
-            Start Planning Free →
+            {user ? "Go to Dashboard →" : "Start Planning Free →"}
           </Link>
-          <Link href="/login" style={{
-            padding: '14px 32px', borderRadius: '12px',
-            border: '1px solid var(--border-bright)',
-            color: 'var(--text-primary)', textDecoration: 'none',
-            fontSize: '16px', fontWeight: '500',
-          }}>
-            Sign in
-          </Link>
+          {!user && (
+            <Link href="/login" style={{
+              padding: '14px 32px', borderRadius: '12px',
+              border: '1px solid var(--border-bright)',
+              color: 'var(--text-primary)', textDecoration: 'none',
+              fontSize: '16px', fontWeight: '500',
+            }}>
+              Sign In
+            </Link>
+          )}
         </div>
 
         {/* Stats */}

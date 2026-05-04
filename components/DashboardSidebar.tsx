@@ -32,7 +32,7 @@ export default function DashboardSidebar({ user }: { user: { email: string; name
       position: 'sticky', top: 0,
     }}>
       {/* Logo */}
-      <Link href="/" style={{
+      <Link href="/dashboard" style={{
         display: 'flex', alignItems: 'center', gap: '10px',
         textDecoration: 'none', marginBottom: '36px', padding: '0 8px',
       }}>
